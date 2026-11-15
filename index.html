@@ -5,99 +5,168 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Realm of Waystones</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=EB+Garamond:ital@0;1&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap">
 <style>
+  /* Layout: full-screen 3D view with HUD overlays; the editor is a three-column workbench. */
   :root {
     --parchment: #f3e6c4;
     --ink: #2b1d0e;
     --gold: #d9a441;
     --gold-hi: #ffd77a;
-    --panel: rgba(22, 16, 10, 0.62);
-    --panel-edge: rgba(217, 164, 65, 0.55);
+    --panel: rgba(22, 16, 10, 0.66);
+    --panel-solid: #1d1610;
+    --panel-2: #2a2017;
+    --edge: rgba(217, 164, 65, 0.45);
+    --accent: #ff5a36;
+    --display: 'Cinzel', Georgia, serif;
+    --body: 'EB Garamond', Georgia, serif;
+    color-scheme: dark;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0a07; color: var(--parchment);
-    font-family: 'EB Garamond', Georgia, serif; user-select: none; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0a07; color: var(--parchment); font-family: var(--body); font-size: 16px; }
   canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
   .hidden { display: none !important; }
+  button { font-family: var(--body); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
+  kbd { font-family: var(--display); font-size: 11px; background: var(--parchment); color: var(--ink); border-radius: 3px; padding: 1px 5px; border-bottom: 2px solid #9c8350; }
+  .btn { font-family: var(--display); font-size: 18px; letter-spacing: 0.08em; padding: 12px 30px; cursor: pointer; color: var(--ink);
+    background: linear-gradient(#ffe3a0, #d9a441); border: 2px solid #6b4511; border-radius: 4px; box-shadow: 0 4px 0 #6b4511; }
+  .btn:hover { filter: brightness(1.07); }
+  .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #6b4511; }
+  .btn.ghost { background: rgba(20, 14, 8, 0.6); color: var(--parchment); border-color: var(--edge); box-shadow: none; }
+  .panel { background: var(--panel); border: 1px solid var(--edge); border-radius: 6px; backdrop-filter: blur(3px); }
 
   /* ---------- title ---------- */
-  #title { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    background: radial-gradient(ellipse at center, rgba(10,8,5,0.25) 0%, rgba(10,8,5,0.75) 75%); text-align: center; padding: 16px; z-index: 10; }
-  #title h1 { font-family: 'Cinzel', serif; font-weight: 700; font-size: clamp(36px, 7vw, 84px); margin: 0; letter-spacing: 0.06em;
-    color: var(--gold-hi); text-shadow: 0 2px 0 #5a3a10, 0 0 30px rgba(255, 200, 100, 0.35); }
-  #title .tag { font-style: italic; font-size: clamp(16px, 2.2vw, 24px); margin: 10px 0 30px; opacity: 0.9; max-width: 640px; }
-  .btn { font-family: 'Cinzel', serif; font-size: 20px; letter-spacing: 0.1em; padding: 14px 38px; cursor: pointer;
-    color: var(--ink); background: linear-gradient(#ffe3a0, #d9a441); border: 2px solid #6b4511; border-radius: 4px;
-    box-shadow: 0 4px 0 #6b4511, 0 0 24px rgba(255, 200, 100, 0.35); transition: transform .1s; }
-  .btn:hover { transform: translateY(-2px); }
-  .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #6b4511; }
-  #loading { font-style: italic; font-size: 20px; opacity: 0.85; animation: pulse 1.4s infinite; }
+  #title { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; text-align: center; padding: 16px; overflow: hidden; }
+  #title-map { position: absolute; inset: -10%; background: #2c4a5c center / cover no-repeat; filter: sepia(0.25) saturate(0.9) brightness(0.55); opacity: 0; transition: opacity 1.5s; }
+  #title-map.ready { opacity: 1; animation: drift 90s ease-in-out infinite alternate; }
+  @keyframes drift { from { transform: scale(1.15) translate(-4%, 1%); } to { transform: scale(1.35) translate(5%, -3%); } }
+  @media (prefers-reduced-motion: reduce) { #title-map.ready { animation: none; } }
+  #title .inner { position: relative; max-width: 760px; }
+  #title h1 { font-family: var(--display); font-weight: 700; font-size: clamp(36px, 7vw, 84px); margin: 0; letter-spacing: 0.05em; color: var(--gold-hi);
+    text-shadow: 0 2px 0 #5a3a10, 0 0 30px rgba(0,0,0,0.8); text-wrap: balance; }
+  #title .tag { font-style: italic; font-size: clamp(17px, 2.2vw, 23px); margin: 12px auto 28px; max-width: 600px; text-shadow: 0 1px 6px #000; }
+  #title-buttons { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  #title-loading { font-style: italic; font-size: 19px; animation: pulse 1.4s infinite; }
+  #title-error { color: #ffb4a0; margin-top: 12px; min-height: 1em; }
   @keyframes pulse { 50% { opacity: 0.4; } }
-  .keys { margin-top: 28px; display: grid; grid-template-columns: auto auto; gap: 6px 18px; font-size: 16px; text-align: left; opacity: 0.9; }
-  kbd { font-family: 'Cinzel', serif; font-size: 12px; background: var(--parchment); color: var(--ink); border-radius: 3px;
-    padding: 2px 6px; border-bottom: 2px solid #9c8350; margin-right: 3px; }
+  .keys { margin: 28px auto 0; display: inline-grid; grid-template-columns: auto auto; gap: 5px 16px; font-size: 15px; text-align: left; background: rgba(10,8,5,0.55); padding: 12px 18px; border-radius: 6px; }
+
+  #loading-screen, #busy { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(10, 8, 5, 0.82); font-size: 20px; font-style: italic; gap: 10px; }
+  #busy { background: rgba(10, 8, 5, 0.55); z-index: 40; }
+  .spinner { width: 34px; height: 34px; border: 3px solid var(--edge); border-top-color: var(--gold-hi); border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   /* ---------- hud ---------- */
   #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
-  .panel { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 6px; backdrop-filter: blur(3px); }
-  #compass { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: min(420px, 70vw); height: 34px; overflow: hidden;
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent);
-            mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent); }
+  #hud button, #bigmap-wrap { pointer-events: auto; }
+  #compass { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: min(420px, 60vw); height: 34px; overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent); mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent); }
   #compass::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: var(--gold); transform: translateX(-1px); }
   #compass-strip { position: absolute; inset: 0; }
-  .mark { position: absolute; top: 7px; transform: translateX(-50%); font-family: 'Cinzel', serif; font-size: 12px; opacity: 0.6; }
+  .mark { position: absolute; top: 7px; transform: translateX(-50%); font-family: var(--display); font-size: 12px; opacity: 0.6; }
   .mark.major { font-size: 16px; opacity: 1; top: 5px; font-weight: 700; }
   .mark.target { color: #59e1ff; font-size: 14px; top: 6px; opacity: 1; text-shadow: 0 0 6px #3fd6ff; }
-
-  #info { position: absolute; top: 14px; left: 14px; padding: 10px 14px; min-width: 220px; max-width: calc(100vw - 230px); }
-  #region-name { font-family: 'Cinzel', serif; font-size: 18px; color: var(--gold-hi); }
-  #objective { font-size: 15px; margin-top: 4px; opacity: 0.92; }
-  #stones-row { margin-top: 6px; font-size: 15px; }
-  #stones { font-family: 'Cinzel', serif; color: #59e1ff; }
-
+  #info { position: absolute; top: 14px; left: 14px; padding: 10px 14px; width: min(330px, calc(100vw - 230px)); }
+  #region-name { font-family: var(--display); font-size: 18px; color: var(--gold-hi); }
+  #region-sub { font-size: 14px; opacity: 0.85; font-style: italic; }
+  #objective { font-size: 14px; margin-top: 6px; }
+  #stones-row { margin-top: 4px; font-size: 14px; }
+  #stones { font-family: var(--display); color: #59e1ff; }
   #map-box { position: absolute; top: 14px; right: 14px; padding: 6px; }
-  #minimap { display: block; width: 180px; height: 180px; border-radius: 3px; }
-  #map-box .hint { font-size: 12px; text-align: center; opacity: 0.8; margin-top: 3px; }
-
-  #bottom { position: absolute; left: 14px; bottom: 14px; padding: 8px 12px; width: 240px; }
-  #bottom .label { font-family: 'Cinzel', serif; font-size: 12px; letter-spacing: .08em; display: flex; justify-content: space-between; }
+  #minimap { display: block; width: 180px; height: 180px; border-radius: 50%; border: 2px solid var(--edge); }
+  #map-box .row { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; }
+  .hud-btn { font-family: var(--display); font-size: 12px; padding: 4px 8px; border-radius: 3px; cursor: pointer; background: rgba(255,255,255,0.08); color: var(--parchment); border: 1px solid var(--edge); }
+  .hud-btn:hover { background: rgba(255, 215, 122, 0.18); }
+  #hud-mapname { font-family: var(--display); font-size: 11px; opacity: 0.7; text-align: center; margin-top: 4px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #bottom { position: absolute; left: 14px; bottom: 14px; padding: 8px 12px; width: 220px; }
+  #bottom .label { font-family: var(--display); font-size: 12px; letter-spacing: .08em; }
   #stamina { height: 8px; background: rgba(255,255,255,0.12); border-radius: 4px; overflow: hidden; margin-top: 4px; }
   #stamina-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #79c26a, #c9e67c); transition: width .1s; }
   #stamina-fill.low { background: linear-gradient(90deg, #c0392b, #e67e22); }
-
   #help { position: absolute; right: 14px; bottom: 14px; padding: 10px 14px; font-size: 14px; line-height: 1.7; }
-
   #banner { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); text-align: center; opacity: 0; width: 90vw; }
   #banner.show { animation: banner 4.5s ease forwards; }
-  #banner-title { font-family: 'Cinzel', serif; font-size: clamp(28px, 5vw, 54px); color: var(--gold-hi);
-    text-shadow: 0 2px 6px rgba(0,0,0,0.8), 0 0 24px rgba(0,0,0,0.6); letter-spacing: 0.05em; }
+  #banner-title { font-family: var(--display); font-size: clamp(28px, 5vw, 54px); color: var(--gold-hi); text-shadow: 0 2px 6px rgba(0,0,0,0.8), 0 0 24px rgba(0,0,0,0.6); }
   #banner-sub { font-style: italic; font-size: clamp(16px, 2vw, 22px); text-shadow: 0 2px 6px rgba(0,0,0,0.9); }
   #banner .rule { width: 260px; max-width: 60vw; height: 1px; margin: 8px auto; background: linear-gradient(90deg, transparent, var(--gold), transparent); }
-  @keyframes banner { 0% { opacity: 0; transform: translate(-50%, 10px); } 12% { opacity: 1; transform: translate(-50%, 0); }
-    75% { opacity: 1; } 100% { opacity: 0; } }
-
-  #toast { position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%); padding: 10px 22px; font-size: 20px;
-    color: #ffe9a8; opacity: 0; white-space: nowrap; }
-  #toast.show { animation: toast 4s ease forwards; }
+  @keyframes banner { 0% { opacity: 0; transform: translate(-50%, 10px); } 12% { opacity: 1; transform: translate(-50%, 0); } 75% { opacity: 1; } 100% { opacity: 0; } }
+  #toast, #ed-toast { position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%); padding: 10px 22px; font-size: 18px; color: #ffe9a8; opacity: 0; max-width: 90vw; text-align: center; pointer-events: none; }
+  #toast.show, #ed-toast.show { animation: toast 4s ease forwards; }
   @keyframes toast { 0% { opacity: 0; } 10% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
   #status { position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%); font-style: italic; opacity: 0.8; text-shadow: 0 1px 3px #000; }
 
-  #bigmap-wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(8,6,4,0.7); z-index: 8; pointer-events: auto; }
-  #bigmap-wrap .frame { padding: 12px; background: #e9d6a6; border: 3px solid #6b4511; border-radius: 4px; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
-  #bigmap { width: min(80vh, 90vw); height: min(80vh, 90vw); display: block; }
-  #bigmap-wrap .cap { color: var(--ink); text-align: center; font-family: 'Cinzel', serif; margin-top: 6px; font-size: 14px; }
+  #bigmap-wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(8,6,4,0.75); z-index: 8; padding: 16px; }
+  #bigmap-wrap .frame { padding: 10px; background: #e9d6a6; border: 3px solid #6b4511; border-radius: 4px; box-shadow: 0 10px 40px rgba(0,0,0,.6); max-width: 100%; }
+  #bigmap { width: min(1100px, 92vw, 170vh); aspect-ratio: 2 / 1; display: block; cursor: pointer; max-width: 100%; }
+  #bigmap-wrap .cap { color: var(--ink); display: flex; justify-content: space-between; gap: 10px; font-family: var(--display); margin-top: 6px; font-size: 13px; flex-wrap: wrap; }
+  #bigmap-wrap .cap button { font-family: var(--display); cursor: pointer; background: none; border: 1px solid #6b4511; color: var(--ink); padding: 2px 10px; border-radius: 3px; }
 
   #victory { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
     background: radial-gradient(ellipse at center, rgba(40,28,8,0.55), rgba(8,6,4,0.9)); z-index: 9; padding: 16px; }
-  #victory h2 { font-family: 'Cinzel', serif; color: var(--gold-hi); font-size: clamp(30px, 5vw, 60px); margin: 0 0 10px; }
+  #victory h2 { font-family: var(--display); color: var(--gold-hi); font-size: clamp(30px, 5vw, 58px); margin: 0 0 10px; }
   #victory p { font-size: 20px; max-width: 620px; font-style: italic; }
-  #victory-stats { font-family: 'Cinzel', serif; font-size: 15px; margin: 6px 0 26px; opacity: 0.85; }
+  #victory-stats { font-family: var(--display); font-size: 15px; margin: 6px 0 26px; opacity: 0.85; }
 
+  /* ---------- editor ---------- */
+  #editor { position: fixed; inset: 0; z-index: 20; display: grid; grid-template-columns: 150px 1fr 250px; grid-template-rows: auto 1fr;
+    background: var(--panel-solid); }
+  #ed-top { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--panel-2); border-bottom: 1px solid var(--edge); flex-wrap: wrap; }
+  #ed-top .brand { font-family: var(--display); color: var(--gold-hi); font-size: 16px; margin-right: 6px; }
+  #ed-name { font-family: var(--display); font-size: 15px; background: rgba(0,0,0,0.3); color: var(--parchment); border: 1px solid var(--edge); border-radius: 4px; padding: 5px 9px; width: 220px; }
+  .tb { font-size: 15px; padding: 5px 11px; border-radius: 4px; cursor: pointer; background: rgba(255,255,255,0.06); color: var(--parchment); border: 1px solid rgba(217,164,65,0.3); }
+  .tb:hover { background: rgba(255,215,122,0.15); }
+  .tb.primary { font-family: var(--display); background: linear-gradient(#ffe3a0, #d9a441); color: var(--ink); border-color: #6b4511; font-weight: 700; }
+  .spacer { flex: 1; }
+  .menu-wrap { position: relative; }
+  .menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 5; min-width: 250px; background: var(--panel-2); border: 1px solid var(--edge); border-radius: 6px; padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+  .menu button { display: block; width: 100%; text-align: left; padding: 7px 10px; background: none; border: none; color: var(--parchment); cursor: pointer; border-radius: 4px; font-size: 15px; }
+  .menu button:hover { background: rgba(255,215,122,0.12); }
+  .menu small { display: block; opacity: 0.7; font-size: 13px; }
+  .menu-row { display: flex; gap: 4px; }
+  .menu-row .menu-del { width: auto; color: #ffb4a0; font-size: 13px; }
+  .menu-empty { padding: 8px; font-style: italic; opacity: 0.8; max-width: 260px; }
+  #ed-tools { overflow-y: auto; padding: 8px; border-right: 1px solid var(--edge); background: var(--panel-2); }
+  .ed-group { font-family: var(--display); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); margin: 10px 2px 4px; }
+  .ed-group:first-child { margin-top: 0; }
+  .ed-tool { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 5px 8px; margin-bottom: 3px; cursor: pointer;
+    background: rgba(255,255,255,0.04); border: 1px solid transparent; border-radius: 4px; color: var(--parchment); font-size: 15px; }
+  .ed-tool:hover { background: rgba(255,215,122,0.1); }
+  .ed-tool.active { background: rgba(255,215,122,0.2); border-color: var(--gold); color: var(--gold-hi); }
+  .ed-tool kbd { font-size: 10px; }
+  #ed-view { position: relative; overflow: hidden; min-width: 0; }
+  #ed-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
+  #ed-status { position: absolute; left: 10px; bottom: 8px; font-size: 13px; padding: 4px 10px; background: rgba(15,11,7,0.75); border-radius: 4px; pointer-events: none; font-variant-numeric: tabular-nums; }
+  #ed-panel { overflow-y: auto; padding: 12px; border-left: 1px solid var(--edge); background: var(--panel-2); display: flex; flex-direction: column; gap: 14px; }
+  #ed-panel h3 { font-family: var(--display); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); margin: 0 0 6px; }
+  #ed-tip { font-style: italic; font-size: 15px; line-height: 1.4; }
+  .field { display: grid; gap: 4px; font-size: 14px; }
+  .field .row { display: flex; justify-content: space-between; }
+  .field input[type=range] { width: 100%; accent-color: var(--gold); }
+  .field input[type=text], .field select { background: rgba(0,0,0,0.3); color: var(--parchment); border: 1px solid var(--edge); border-radius: 4px; padding: 5px 8px; font-family: var(--body); font-size: 15px; width: 100%; }
+  #ed-biomes { display: grid; grid-template-columns: 1fr; gap: 3px; }
+  .swatch { display: flex; align-items: center; gap: 8px; padding: 4px 6px; background: none; border: 1px solid transparent; border-radius: 4px; color: var(--parchment); cursor: pointer; text-align: left; font-size: 14px; }
+  .swatch i { width: 18px; height: 18px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.5); flex: none; }
+  .swatch.active { border-color: var(--gold); background: rgba(255,215,122,0.15); }
+  .danger { color: #ffb4a0; border-color: rgba(255,120,90,0.5) !important; }
+  #ed-stats { font-size: 13px; opacity: 0.8; line-height: 1.5; }
+  .shortcuts { font-size: 13px; line-height: 1.7; opacity: 0.85; }
+  #ed-toast { bottom: 40px; z-index: 6; background: rgba(15,11,7,0.85); border: 1px solid var(--edge); border-radius: 6px; }
+
+  #modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(5,4,2,0.6); padding: 16px; }
+  #modal .box { background: var(--panel-2); border: 1px solid var(--edge); border-radius: 8px; padding: 20px; max-width: 420px; font-size: 17px; }
+  #modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+  @media (max-width: 860px) {
+    #editor { grid-template-columns: 110px 1fr; grid-template-rows: auto 1fr auto; }
+    #ed-panel { grid-column: 1 / -1; max-height: 34vh; border-left: none; border-top: 1px solid var(--edge); }
+    #ed-name { width: 140px; }
+  }
   @media (max-width: 640px) {
     #map-box { transform: scale(0.7); transform-origin: top right; }
     #help { display: none; }
-    #info { max-width: calc(100vw - 160px); min-width: 0; }
+    #info { width: calc(100vw - 160px); }
     #compass { top: auto; bottom: 70px; }
   }
 </style>
@@ -106,39 +175,53 @@
 <canvas id="game" tabindex="0"></canvas>
 
 <div id="title">
-  <h1>Realm of Waystones</h1>
-  <div class="tag">From the green hills of Thistledown to the burning slopes of Mount Cinder, five ancient waystones sleep. Wake them all.</div>
-  <div id="loading">Shaping the world…</div>
-  <button id="start-btn" class="btn hidden">Begin Journey</button>
-  <div class="keys">
-    <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows</div><div>Walk</div>
-    <div><kbd>Shift</kbd></div><div>Run</div>
-    <div><kbd>Space</kbd></div><div>Jump</div>
-    <div>Mouse / <kbd>Q</kbd><kbd>E</kbd></div><div>Turn the camera (click to lock the mouse)</div>
-    <div>Scroll wheel</div><div>Zoom</div>
-    <div><kbd>M</kbd></div><div>Open the map</div>
+  <div id="title-map"></div>
+  <div class="inner">
+    <h1>Realm of Waystones</h1>
+    <div class="tag">A world shaped from Earth's own coasts and mountains, renamed and remade. Walk it, or redraw it in the map editor.</div>
+    <div id="title-loading">Shaping the world…</div>
+    <div id="title-buttons" class="hidden">
+      <button id="btn-explore" class="btn" type="button">Explore the Realm</button>
+      <button id="btn-editor" class="btn ghost" type="button">Open the Map Editor</button>
+      <button id="btn-continue" class="btn ghost hidden" type="button">Open saved map</button>
+    </div>
+    <div id="title-error"></div>
+    <div class="keys">
+      <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div><div>Walk · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump</div>
+      <div>Mouse / <kbd>Q</kbd><kbd>E</kbd></div><div>Turn the camera · wheel to zoom</div>
+      <div><kbd>M</kbd></div><div>World map (travel between woken waystones)</div>
+      <div><kbd>Tab</kbd></div><div>Edit this map</div>
+    </div>
   </div>
 </div>
+
+<div id="loading-screen" class="hidden"><div class="spinner"></div><div id="loading-text">Preparing the journey…</div></div>
+<div id="busy" class="hidden"><div class="spinner"></div><div id="busy-text">Working…</div></div>
 
 <div id="hud" class="hidden">
   <div id="compass" class="panel"><div id="compass-strip"></div></div>
   <div id="info" class="panel">
     <div id="region-name">—</div>
+    <div id="region-sub"></div>
     <div id="objective"></div>
-    <div id="stones-row">Waystones lit: <span id="stones">0 / 5</span></div>
+    <div id="stones-row">Waystones awake: <span id="stones">0 / 0</span></div>
   </div>
   <div id="map-box" class="panel">
     <canvas id="minimap" width="180" height="180"></canvas>
-    <div class="hint"><kbd>M</kbd> full map</div>
+    <div class="row">
+      <button id="hud-edit" class="hud-btn" type="button" title="Open this map in the editor (Tab)">Edit map</button>
+      <button id="hud-title" class="hud-btn" type="button">Title</button>
+    </div>
+    <div id="hud-mapname"></div>
   </div>
   <div id="bottom" class="panel">
-    <div class="label"><span>Stamina</span></div>
+    <div class="label">Stamina</div>
     <div id="stamina"><div id="stamina-fill"></div></div>
   </div>
   <div id="help" class="panel">
     <div><kbd>WASD</kbd> walk · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump</div>
     <div>Mouse / <kbd>Q</kbd><kbd>E</kbd> camera · wheel zoom</div>
-    <div><kbd>M</kbd> map · <kbd>H</kbd> hide help</div>
+    <div><kbd>M</kbd> map · <kbd>Tab</kbd> edit · <kbd>H</kbd> hide help</div>
   </div>
   <div id="status"></div>
   <div id="banner"><div id="banner-title"></div><div class="rule"></div><div id="banner-sub"></div></div>
@@ -147,16 +230,104 @@
 
 <div id="bigmap-wrap" class="hidden">
   <div class="frame">
-    <canvas id="bigmap" width="720" height="720"></canvas>
-    <div class="cap">The Realm · press M or click to close</div>
+    <canvas id="bigmap"></canvas>
+    <div class="cap"><span>Click a golden waystone to travel there</span><button id="bigmap-close" type="button">Close (M)</button></div>
   </div>
 </div>
 
 <div id="victory" class="hidden">
-  <h2>The Five Waystones Burn Bright</h2>
-  <p>Their light runs from the hills to the ash, and the old roads wake again. Your journey is told in every corner of the realm.</p>
+  <h2>Every Waystone Burns Bright</h2>
+  <p>Their light runs from shore to shore, and the old roads wake again.</p>
   <div id="victory-stats"></div>
-  <button id="continue-btn" class="btn">Keep Exploring</button>
+  <button id="continue-btn" class="btn" type="button">Keep Exploring</button>
+</div>
+
+<div id="editor" class="hidden">
+  <header id="ed-top">
+    <span class="brand">Map Editor</span>
+    <input id="ed-name" type="text" aria-label="Map name" maxlength="40">
+    <div class="menu-wrap">
+      <button id="ed-new" class="tb" type="button">New ▾</button>
+      <div id="ed-new-menu" class="menu hidden">
+        <button type="button" data-kind="earth">Earth Remixed<small>Real coastlines and mountains, fantasy names</small></button>
+        <button type="button" data-kind="continent">Random continent<small>A fresh landmass with climates and towns</small></button>
+        <button type="button" data-kind="blank">Empty sea<small>One small island; draw everything yourself</small></button>
+      </div>
+    </div>
+    <div class="menu-wrap">
+      <button id="ed-open" class="tb" type="button">Open ▾</button>
+      <div id="ed-open-menu" class="menu hidden"></div>
+    </div>
+    <button id="ed-save" class="tb" type="button" title="Save in this browser (Ctrl+S)">Save</button>
+    <button id="ed-export" class="tb" type="button" title="Download as a .realm file">Export</button>
+    <button id="ed-import" class="tb" type="button" title="Open a .realm file">Import</button>
+    <input id="ed-file" type="file" accept=".realm,.json,application/json,application/gzip" class="hidden">
+    <button id="ed-undo" class="tb" type="button" title="Undo (Ctrl+Z)">Undo</button>
+    <button id="ed-redo" class="tb" type="button" title="Redo (Ctrl+Shift+Z)">Redo</button>
+    <span class="spacer"></span>
+    <button id="ed-play-here" class="tb" type="button" title="Start walking at the centre of the view">Play from view</button>
+    <button id="ed-play" class="tb primary" type="button">Play ▶</button>
+    <button id="ed-home" class="tb" type="button">Title</button>
+  </header>
+  <aside id="ed-tools"></aside>
+  <main id="ed-view">
+    <canvas id="ed-canvas"></canvas>
+    <div id="ed-status"></div>
+    <div id="ed-toast"></div>
+  </main>
+  <aside id="ed-panel">
+    <section>
+      <h3>Tool</h3>
+      <div id="ed-tip"></div>
+    </section>
+    <section id="ed-brush" class="field">
+      <div class="row"><span>Brush size</span><span id="ed-size-val"></span></div>
+      <input id="ed-size" type="range" min="1" max="40" step="1">
+      <div class="row"><span>Strength</span><span id="ed-strength-val"></span></div>
+      <input id="ed-strength" type="range" min="5" max="100" step="5">
+    </section>
+    <section id="ed-biomes-box">
+      <h3>Biome</h3>
+      <div id="ed-biomes"></div>
+    </section>
+    <section id="ed-label-box" class="field">
+      <h3>New label kind</h3>
+      <select id="ed-label-size">
+        <option value="realm">Realm or kingdom</option>
+        <option value="region" selected>Region</option>
+        <option value="sea">Sea</option>
+      </select>
+    </section>
+    <section id="ed-road-box">
+      <h3>Roads</h3>
+      <p class="shortcuts">Click to add points. Clicking a place snaps the road to it. Double-click or press Enter to finish.</p>
+      <button id="ed-autoroads" class="tb" type="button">Build roads automatically</button>
+    </section>
+    <section id="ed-sel" class="field hidden">
+      <h3>Selected: <span id="ed-sel-type"></span></h3>
+      <label id="ed-sel-name-row" class="field">Name<input id="ed-sel-name" type="text" maxlength="40"></label>
+      <label id="ed-sel-size-row" class="field">Kind
+        <select id="ed-sel-size"><option value="realm">Realm or kingdom</option><option value="region">Region</option><option value="sea">Sea</option></select>
+      </label>
+      <button id="ed-sel-delete" class="tb danger" type="button">Delete</button>
+    </section>
+    <section>
+      <h3>This map</h3>
+      <div id="ed-stats"></div>
+    </section>
+    <section class="shortcuts">
+      <h3>Shortcuts</h3>
+      Scroll to zoom, right-drag or Space-drag to pan, <kbd>0</kbd> to fit.<br>
+      <kbd>[</kbd> <kbd>]</kbd> brush size · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo · <kbd>Del</kbd> remove selected
+    </section>
+  </aside>
+</div>
+
+<div id="modal" class="hidden">
+  <div class="box">
+    <div id="modal-text"></div>
+    <div class="actions"><button id="modal-cancel" class="tb" type="button">Cancel</button><button id="modal-ok" class="tb primary" type="button">Continue</button></div>
+  </div>
 </div>
 
 <script type="importmap">

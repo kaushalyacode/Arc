@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { WATER_LEVEL, HALF } from './world.js';
+const WATER_LEVEL = 0;
 
 const SWIM_DEPTH = 1.3; // how far below the surface the feet sit when swimming
 const MAX_SLOPE = 1.05; // rise/run the traveller can still walk up (~46 degrees)
@@ -9,10 +9,11 @@ function mat(color, extra = {}) {
 }
 
 export class Player {
+  // world: { heightAt(x, z), colliders, minX, maxX, minZ, maxZ }
   constructor(scene, world, start) {
     this.world = world;
     this.pos = new THREE.Vector3(start.x, 0, start.z);
-    this.pos.y = world.groundAt(start.x, start.z);
+    this.pos.y = Math.max(world.heightAt(start.x, start.z), WATER_LEVEL - SWIM_DEPTH);
     this.vel = new THREE.Vector3();
     this.facing = Math.PI / 2; // looking east
     this.onGround = true;
@@ -94,12 +95,12 @@ export class Player {
 
   canMove(x0, z0, x1, z1) {
     const w = this.world;
-    const g1 = w.groundAt(x1, z1);
+    const g1 = w.heightAt(x1, z1);
     if (g1 < WATER_LEVEL - SWIM_DEPTH) return true; // deep water: swim
     if (g1 <= this.pos.y + 0.45) return true; // flat, downhill or a small step
-    const t0 = w.terrainAt(x0, z0), t1 = w.terrainAt(x1, z1);
+    const t0 = w.heightAt(x0, z0);
     const dist = Math.hypot(x1 - x0, z1 - z0) || 1e-6;
-    return (t1 - t0) / dist <= MAX_SLOPE && g1 - this.pos.y < 2;
+    return (g1 - t0) / dist <= MAX_SLOPE && g1 - this.pos.y < 2;
   }
 
   update(dt, input, camYaw) {
@@ -131,20 +132,20 @@ export class Player {
     else if (this.canMove(p.x, p.z, p.x, nz)) { p.z = nz; this.vel.x *= 0.5; }
     else { this.vel.x *= 0.2; this.vel.z *= 0.2; }
 
-    for (const c of this.world.colliders) {
+    this.world.colliders.each(p.x, p.z, (c) => {
       const dx = p.x - c.x, dz = p.z - c.z;
       const d = Math.hypot(dx, dz), min = c.r + 0.5;
       if (d < min && d > 1e-6) { p.x = c.x + (dx / d) * min; p.z = c.z + (dz / d) * min; }
-    }
-    const lim = HALF - 40;
-    p.x = Math.max(-lim, Math.min(lim, p.x));
-    p.z = Math.max(-lim, Math.min(lim, p.z));
+    });
+    const w = this.world;
+    p.x = Math.max(w.minX + 30, Math.min(w.maxX - 30, p.x));
+    p.z = Math.max(w.minZ + 30, Math.min(w.maxZ - 30, p.z));
     const moved = Math.hypot(p.x - ox, p.z - oz);
     this.distance += moved;
     this.speed = moved / Math.max(dt, 1e-4);
 
     // vertical
-    const ground = this.world.groundAt(p.x, p.z);
+    const ground = this.world.heightAt(p.x, p.z);
     const floor = Math.max(ground, WATER_LEVEL - SWIM_DEPTH);
     this.swimming = ground < WATER_LEVEL - SWIM_DEPTH;
     if (input.jump && (this.onGround || this.swimming) && !this.swimming) {
@@ -193,6 +194,17 @@ export class Player {
     }
     this.body.position.y = this.onGround ? Math.abs(Math.sin(this.phase)) * 0.07 * Math.min(gait, 1.5) : 0;
     this.body.rotation.x = this.sprinting ? 0.18 : 0.04 * Math.min(gait, 1);
+  }
+
+  teleport(x, z) {
+    this.pos.set(x, Math.max(this.world.heightAt(x, z), WATER_LEVEL - SWIM_DEPTH) + 0.5, z);
+    this.vel.set(0, 0, 0);
+    this.sync();
+  }
+
+  dispose(scene) {
+    scene.remove(this.mesh);
+    this.mesh.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
   }
 
   sync() {
