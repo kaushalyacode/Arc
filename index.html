@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1d1610">
 <title>Realm of Waystones</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap">
@@ -23,8 +26,13 @@
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0a07; color: var(--parchment); font-family: var(--body); font-size: 16px; }
-  canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0a07; color: var(--parchment); font-family: var(--body); font-size: 16px;
+    -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; overscroll-behavior: none; }
+  input, select { -webkit-user-select: text; user-select: text; }
+  canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; touch-action: none; }
+  .touch-only { display: none; }
+  body.touch .touch-only { display: revert; }
+  body.touch .desktop-only { display: none !important; }
   .hidden { display: none !important; }
   button { font-family: var(--body); }
   button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
@@ -50,6 +58,7 @@
   #title-loading { font-style: italic; font-size: 19px; animation: pulse 1.4s infinite; }
   #title-error { color: #ffb4a0; margin-top: 12px; min-height: 1em; }
   @keyframes pulse { 50% { opacity: 0.4; } }
+  .touch-hints { margin: 22px auto 0; font-size: 15px; font-style: italic; background: rgba(10,8,5,0.55); padding: 10px 16px; border-radius: 6px; max-width: 420px; }
   .keys { margin: 28px auto 0; display: inline-grid; grid-template-columns: auto auto; gap: 5px 16px; font-size: 15px; text-align: left; background: rgba(10,8,5,0.55); padding: 12px 18px; border-radius: 6px; }
 
   #loading-screen, #busy { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -68,19 +77,19 @@
   .mark { position: absolute; top: 7px; transform: translateX(-50%); font-family: var(--display); font-size: 12px; opacity: 0.6; }
   .mark.major { font-size: 16px; opacity: 1; top: 5px; font-weight: 700; }
   .mark.target { color: #59e1ff; font-size: 14px; top: 6px; opacity: 1; text-shadow: 0 0 6px #3fd6ff; }
-  #info { position: absolute; top: 14px; left: 14px; padding: 10px 14px; width: min(330px, calc(100vw - 230px)); }
+  #info { position: absolute; top: max(14px, env(safe-area-inset-top)); left: max(14px, env(safe-area-inset-left)); padding: 10px 14px; width: min(330px, calc(100vw - 230px)); }
   #region-name { font-family: var(--display); font-size: 18px; color: var(--gold-hi); }
   #region-sub { font-size: 14px; opacity: 0.85; font-style: italic; }
   #objective { font-size: 14px; margin-top: 6px; }
   #stones-row { margin-top: 4px; font-size: 14px; }
   #stones { font-family: var(--display); color: #59e1ff; }
-  #map-box { position: absolute; top: 14px; right: 14px; padding: 6px; }
+  #map-box { position: absolute; top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); padding: 6px; }
   #minimap { display: block; width: 180px; height: 180px; border-radius: 50%; border: 2px solid var(--edge); }
   #map-box .row { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; }
   .hud-btn { font-family: var(--display); font-size: 12px; padding: 4px 8px; border-radius: 3px; cursor: pointer; background: rgba(255,255,255,0.08); color: var(--parchment); border: 1px solid var(--edge); }
   .hud-btn:hover { background: rgba(255, 215, 122, 0.18); }
   #hud-mapname { font-family: var(--display); font-size: 11px; opacity: 0.7; text-align: center; margin-top: 4px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #bottom { position: absolute; left: 14px; bottom: 14px; padding: 8px 12px; width: 220px; }
+  #bottom { position: absolute; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); padding: 8px 12px; width: 220px; }
   #bottom .label { font-family: var(--display); font-size: 12px; letter-spacing: .08em; }
   #stamina { height: 8px; background: rgba(255,255,255,0.12); border-radius: 4px; overflow: hidden; margin-top: 4px; }
   #stamina-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #79c26a, #c9e67c); transition: width .1s; }
@@ -137,6 +146,7 @@
   .ed-tool kbd { font-size: 10px; }
   #ed-view { position: relative; overflow: hidden; min-width: 0; }
   #ed-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
+  #ed-panel, #ed-tools, #ed-top { touch-action: pan-x pan-y; }
   #ed-status { position: absolute; left: 10px; bottom: 8px; font-size: 13px; padding: 4px 10px; background: rgba(15,11,7,0.75); border-radius: 4px; pointer-events: none; font-variant-numeric: tabular-nums; }
   #ed-panel { overflow-y: auto; padding: 12px; border-left: 1px solid var(--edge); background: var(--panel-2); display: flex; flex-direction: column; gap: 14px; }
   #ed-panel h3 { font-family: var(--display); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); margin: 0 0 6px; }
@@ -158,16 +168,88 @@
   #modal .box { background: var(--panel-2); border: 1px solid var(--edge); border-radius: 8px; padding: 20px; max-width: 420px; font-size: 17px; }
   #modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
-  @media (max-width: 860px) {
-    #editor { grid-template-columns: 110px 1fr; grid-template-rows: auto 1fr auto; }
-    #ed-panel { grid-column: 1 / -1; max-height: 34vh; border-left: none; border-top: 1px solid var(--edge); }
-    #ed-name { width: 140px; }
+  /* ---------- touch controls ---------- */
+  #touch-ui { position: absolute; inset: 0; pointer-events: none; }
+  #stick-base { position: fixed; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; opacity: 0; transition: opacity .15s;
+    background: radial-gradient(circle, rgba(255,240,200,0.1), rgba(255,240,200,0.22)); border: 2px solid rgba(255,215,122,0.55); pointer-events: none; }
+  #stick-base.show { opacity: 1; }
+  #stick-knob { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; border-radius: 50%; transform: translate(-50%, -50%);
+    background: radial-gradient(circle at 40% 35%, #ffe9b0, #d9a441); box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+  #stick-hint { position: absolute; left: max(28px, env(safe-area-inset-left)); bottom: max(30px, env(safe-area-inset-bottom)); width: 96px; height: 96px; border-radius: 50%;
+    border: 2px dashed rgba(255,215,122,0.35); display: flex; align-items: center; justify-content: center; text-align: center; font-size: 13px; font-style: italic; opacity: 0.75; }
+  #stick-base.show ~ #stick-hint { opacity: 0; }
+  .tbtn { position: absolute; pointer-events: auto; border-radius: 50%; border: 2px solid rgba(255,215,122,0.6); color: var(--parchment); font-family: var(--display);
+    background: rgba(22,16,10,0.55); display: flex; align-items: center; justify-content: center; font-size: 13px; letter-spacing: 0.05em; touch-action: none; backdrop-filter: blur(2px); }
+  .tbtn.pressed, .tbtn.on { background: rgba(217,164,65,0.75); color: var(--ink); }
+  #t-jump { width: 82px; height: 82px; right: max(26px, env(safe-area-inset-right)); bottom: max(30px, env(safe-area-inset-bottom)); font-size: 15px; }
+  #t-run { width: 62px; height: 62px; right: calc(max(26px, env(safe-area-inset-right)) + 96px); bottom: max(26px, env(safe-area-inset-bottom)); }
+  /* Landscape: Fullscreen · Map · Run · Jump in one row along the bottom right. */
+  #t-map { width: 54px; height: 54px; right: calc(max(26px, env(safe-area-inset-right)) + 172px); bottom: max(30px, env(safe-area-inset-bottom)); }
+  #t-fullscreen { width: 44px; height: 44px; right: calc(max(26px, env(safe-area-inset-right)) + 240px); bottom: calc(max(30px, env(safe-area-inset-bottom)) + 5px); font-size: 18px; }
+  /* Portrait: Map and Fullscreen stack above Jump; the compass sits above the stamina bar. */
+  @media (orientation: portrait) {
+    #t-map { right: calc(max(26px, env(safe-area-inset-right)) + 14px); bottom: calc(max(30px, env(safe-area-inset-bottom)) + 96px); }
+    #t-fullscreen { right: calc(max(26px, env(safe-area-inset-right)) + 19px); bottom: calc(max(30px, env(safe-area-inset-bottom)) + 162px); }
+    body.touch #compass { top: auto; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 104px); width: min(220px, 52vw); }
   }
+  body.touch #hud-mapname { display: none; }
+  body.touch #help { display: none; }
+  body.touch #bottom { left: 50%; transform: translateX(-50%); width: 150px; padding: 5px 10px; bottom: max(10px, env(safe-area-inset-bottom)); }
+  body.touch #bottom .label { display: none; }
+  body.touch #compass { width: min(300px, 46vw); }
+  body.touch .hud-btn { font-size: 13px; padding: 7px 10px; }
+  body.touch #status { bottom: 46px; }
+  body.touch #minimap { width: 132px; height: 132px; }
+  body.touch #hud-mapname { max-width: 132px; }
+  body.touch #info { width: min(300px, calc(100vw - 210px)); padding: 8px 10px; }
+  body.touch #bigmap-wrap .cap button { padding: 8px 14px; font-size: 14px; }
+
+  @media (max-height: 520px) {
+    #info { padding: 6px 10px !important; }
+    #region-name { font-size: 15px; }
+    #region-sub, #objective, #stones-row { font-size: 12.5px; }
+    #objective { margin-top: 2px; }
+    body.touch #minimap { width: 104px; height: 104px; }
+    #map-box .row { margin-top: 4px; }
+    #banner { top: 16%; }
+    #banner-title { font-size: 30px; }
+    #banner-sub { font-size: 15px; }
+    #toast { font-size: 15px; bottom: 30%; }
+    #title .tag { margin: 8px auto 16px; }
+    .keys, .touch-hints { margin-top: 14px !important; }
+    #bigmap { width: min(1100px, 92vw, 150vh); }
+  }
+
+  /* ---------- editor on small screens ---------- */
+  #ed-options { display: none; }
+  @media (max-width: 900px), (max-height: 560px) {
+    #editor { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+    #ed-top { flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding: 6px max(8px, env(safe-area-inset-right)) 6px max(8px, env(safe-area-inset-left)); scrollbar-width: none; }
+    #ed-top::-webkit-scrollbar { display: none; }
+    #ed-top .brand, #ed-top .spacer { display: none; }
+    #ed-top > * { flex: none; }
+    #ed-name { width: 130px; font-size: 14px; }
+    .tb { padding: 7px 10px; font-size: 14px; white-space: nowrap; }
+    #ed-options { display: inline-block; }
+    #editor.panel-open #ed-options { background: rgba(255,215,122,0.25); }
+    #ed-tools { grid-row: 3; display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden; padding: 6px max(8px, env(safe-area-inset-left)) max(6px, env(safe-area-inset-bottom));
+      border-right: none; border-top: 1px solid var(--edge); scrollbar-width: none; }
+    #ed-tools::-webkit-scrollbar { display: none; }
+    .ed-group { display: none; }
+    .ed-tool { width: auto; flex: none; margin: 0; padding: 8px 12px; }
+    body.touch .ed-tool kbd, body.touch .shortcuts { display: none; }
+    #ed-panel { position: fixed; z-index: 4; right: 0; top: 50px; bottom: 58px; width: min(290px, 82vw); grid-column: auto; max-height: none;
+      border-left: 1px solid var(--edge); border-top: none; transform: translateX(105%); transition: transform .2s; box-shadow: -8px 0 24px rgba(0,0,0,0.4);
+      padding-right: max(12px, env(safe-area-inset-right)); }
+    #editor.panel-open #ed-panel { transform: none; }
+    #ed-status { font-size: 12px; max-width: calc(100% - 20px); }
+  }
+
   @media (max-width: 640px) {
     #map-box { transform: scale(0.7); transform-origin: top right; }
     #help { display: none; }
     #info { width: calc(100vw - 160px); }
-    #compass { top: auto; bottom: 70px; }
+    body:not(.touch) #compass { top: auto; bottom: 70px; }
   }
 </style>
 </head>
@@ -186,7 +268,8 @@
       <button id="btn-continue" class="btn ghost hidden" type="button">Open saved map</button>
     </div>
     <div id="title-error"></div>
-    <div class="keys">
+    <div class="touch-hints touch-only">Left thumb: move · Right thumb: look · Pinch: zoom<br>Turn your phone sideways for the best view.</div>
+    <div class="keys desktop-only">
       <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div><div>Walk · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump</div>
       <div>Mouse / <kbd>Q</kbd><kbd>E</kbd></div><div>Turn the camera · wheel to zoom</div>
       <div><kbd>M</kbd></div><div>World map (travel between woken waystones)</div>
@@ -224,6 +307,14 @@
     <div><kbd>M</kbd> map · <kbd>Tab</kbd> edit · <kbd>H</kbd> hide help</div>
   </div>
   <div id="status"></div>
+  <div id="touch-ui" class="touch-only">
+    <div id="stick-base"><div id="stick-knob"></div></div>
+    <div id="stick-hint">Touch here to move</div>
+    <button id="t-jump" class="tbtn" type="button">Jump</button>
+    <button id="t-run" class="tbtn" type="button">Run</button>
+    <button id="t-map" class="tbtn" type="button">Map</button>
+    <button id="t-fullscreen" class="tbtn" type="button" aria-label="Full screen">⛶</button>
+  </div>
   <div id="banner"><div id="banner-title"></div><div class="rule"></div><div id="banner-sub"></div></div>
   <div id="toast" class="panel"></div>
 </div>
@@ -267,6 +358,7 @@
     <span class="spacer"></span>
     <button id="ed-play-here" class="tb" type="button" title="Start walking at the centre of the view">Play from view</button>
     <button id="ed-play" class="tb primary" type="button">Play ▶</button>
+    <button id="ed-options" class="tb" type="button">Options</button>
     <button id="ed-home" class="tb" type="button">Title</button>
   </header>
   <aside id="ed-tools"></aside>
@@ -300,8 +392,9 @@
     </section>
     <section id="ed-road-box">
       <h3>Roads</h3>
-      <p class="shortcuts">Click to add points. Clicking a place snaps the road to it. Double-click or press Enter to finish.</p>
-      <button id="ed-autoroads" class="tb" type="button">Build roads automatically</button>
+      <p>Click to add points. Clicking a place snaps the road to it. Double-click or press Enter to finish.</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button id="ed-finishroad" class="tb" type="button">Finish road</button>
+      <button id="ed-autoroads" class="tb" type="button">Build roads automatically</button></div>
     </section>
     <section id="ed-sel" class="field hidden">
       <h3>Selected: <span id="ed-sel-type"></span></h3>

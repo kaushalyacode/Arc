@@ -99,6 +99,8 @@ export class Editor {
     $('ed-sel-delete').addEventListener('click', () => this.deleteSelected());
     $('ed-label-size').addEventListener('change', (e) => { this.labelSize = e.target.value; });
     $('ed-autoroads').addEventListener('click', () => this.autoRoads());
+    $('ed-finishroad').addEventListener('click', () => this.finishRoad());
+    $('ed-options').addEventListener('click', () => document.getElementById('editor').classList.toggle('panel-open'));
     $('ed-play').addEventListener('click', () => this.onPlay(this.doc, null));
     $('ed-play-here').addEventListener('click', () => {
       const [gx, gy] = this.toGrid(this.cssW / 2, this.cssH / 2);
@@ -188,6 +190,10 @@ export class Editor {
     this.tool = id;
     if (id !== 'road') this.roadDraft = null;
     for (const t of TOOLS) $('tool-' + t.id).classList.toggle('active', t.id === id);
+    // On small screens the options live in a slide-out panel; open it when the tool needs a choice.
+    const narrow = matchMedia('(max-width: 900px), (max-height: 560px)').matches;
+    if (narrow) $('editor').classList.toggle('panel-open', ['biome', 'label', 'road'].includes(id));
+    $('tool-' + id).scrollIntoView({ block: 'nearest', inline: 'nearest' });
     this.refreshPanel();
     this.redraw();
   }
@@ -343,11 +349,11 @@ export class Editor {
       this.redraw();
       this.status();
     }, { passive: false });
-    c.addEventListener('pointerdown', (e) => this.pointerDown(e));
-    c.addEventListener('pointermove', (e) => this.pointerMove(e));
-    c.addEventListener('pointerup', (e) => this.pointerUp(e));
-    c.addEventListener('pointercancel', (e) => this.pointerUp(e));
-    c.addEventListener('pointerleave', () => { this.mouse.inside = false; this.redraw(); });
+    c.addEventListener('pointerdown', (e) => (e.pointerType === 'touch' ? this.touchDown(e) : this.pointerDown(e)));
+    c.addEventListener('pointermove', (e) => (e.pointerType === 'touch' ? this.touchMove(e) : this.pointerMove(e)));
+    c.addEventListener('pointerup', (e) => (e.pointerType === 'touch' ? this.touchUp(e) : this.pointerUp(e)));
+    c.addEventListener('pointercancel', (e) => (e.pointerType === 'touch' ? this.touchUp(e, true) : this.pointerUp(e)));
+    c.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') { this.mouse.inside = false; this.redraw(); } });
     c.addEventListener('dblclick', () => { if (this.tool === 'road') this.finishRoad(); });
     window.addEventListener('keydown', (e) => this.keyDown(e));
     window.addEventListener('keyup', (e) => { if (e.code === 'Space') this.spaceHeld = false; });
@@ -378,7 +384,7 @@ export class Editor {
   pointerDown(e) {
     const [sx, sy] = this.eventPos(e);
     const [gx, gy] = this.toGrid(sx, sy);
-    this.canvas.setPointerCapture(e.pointerId);
+    try { this.canvas.setPointerCapture(e.pointerId); } catch (_) { /* pointer already gone */ }
     const t = TOOLS.find((x) => x.id === this.tool);
     if (e.button === 1 || e.button === 2 || this.spaceHeld || t.kind === 'pan') {
       this.drag = { mode: 'pan', sx, sy, ox: this.view.ox, oy: this.view.oy };
@@ -395,7 +401,7 @@ export class Editor {
       this.doc.places.push(p);
       this.selected = { kind: 'place', id: p.id };
       this.changed();
-      this.toast(`${PLACE_TYPES[p.type].label} "${p.name}" placed. Rename it on the right.`);
+      this.toast(`${PLACE_TYPES[p.type].label} "${p.name}" placed. Rename it in the side panel.`);
     } else if (t.kind === 'label') {
       if (!this.inMap(gx, gy)) return;
       this.pushObjects();
@@ -453,6 +459,95 @@ export class Editor {
     }
     this.status();
     this.redraw();
+  }
+
+  // ------------------------------------------------------------ touch
+  // One finger uses the current tool; two fingers pinch to zoom and pan.
+  // A touch waits for a short move (or the finger lifting) before it acts,
+  // so starting a pinch never paints by accident.
+  touchDown(e) {
+    e.preventDefault();
+    this.touches = this.touches || new Map();
+    const [sx, sy] = this.eventPos(e);
+    this.touches.set(e.pointerId, { sx, sy });
+    try { this.canvas.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+    if (this.touches.size === 1) {
+      this.pending = { id: e.pointerId, clientX: e.clientX, clientY: e.clientY, sx, sy, started: false, t: performance.now() };
+      clearTimeout(this.pendingTimer);
+      // Holding still starts the action too (useful for raise or lower).
+      this.pendingTimer = setTimeout(() => {
+        const t = TOOLS.find((x) => x.id === this.tool);
+        if (this.pending && !this.pending.started && this.touches.size === 1 && t.kind === 'brush') this.startPending();
+      }, 220);
+    } else if (this.touches.size === 2) {
+      clearTimeout(this.pendingTimer);
+      if (this.pending?.started) {
+        // A second finger arrived mid-stroke: undo that stroke and switch to pinch.
+        if (this.stroke) { this.endStroke(); this.undo(); this.redoStack.pop(); }
+        if (this.drag?.mode === 'move') {
+          const moved = this.drag.moved;
+          this.pointerUp();
+          if (moved) { this.undo(); this.redoStack.pop(); }
+        }
+        this.drag = null;
+      }
+      this.pending = null;
+      this.pinch = this.pinchState();
+    }
+  }
+
+  pinchState() {
+    const [a, b] = [...this.touches.values()];
+    return { d: Math.hypot(a.sx - b.sx, a.sy - b.sy), mx: (a.sx + b.sx) / 2, my: (a.sy + b.sy) / 2 };
+  }
+
+  startPending() {
+    const p = this.pending;
+    p.started = true;
+    const [gx, gy] = this.toGrid(p.sx, p.sy);
+    Object.assign(this.mouse, { sx: p.sx, sy: p.sy, gx, gy, inside: true });
+    this.pointerDown({ clientX: p.clientX, clientY: p.clientY, button: 0, pointerId: p.id });
+  }
+
+  touchMove(e) {
+    if (!this.touches || !this.touches.has(e.pointerId)) return;
+    e.preventDefault();
+    const [sx, sy] = this.eventPos(e);
+    this.touches.set(e.pointerId, { sx, sy });
+    if (this.touches.size >= 2 && this.pinch) {
+      const now = this.pinchState();
+      const [gx, gy] = this.toGrid(this.pinch.mx, this.pinch.my);
+      const ns = clamp(this.view.scale * (now.d / (this.pinch.d || now.d)), this.fitScale() * 0.6, 40);
+      this.view.scale = ns;
+      this.view.ox = now.mx - gx * ns;
+      this.view.oy = now.my - gy * ns;
+      this.pinch = now;
+      this.userMoved = true;
+      this.redraw();
+      this.status();
+      return;
+    }
+    const p = this.pending;
+    if (p && p.id === e.pointerId) {
+      if (!p.started && Math.hypot(sx - p.sx, sy - p.sy) > 6) { clearTimeout(this.pendingTimer); this.startPending(); }
+      if (p.started) this.pointerMove(e);
+    }
+  }
+
+  touchUp(e, cancelled = false) {
+    if (!this.touches || !this.touches.has(e.pointerId)) return;
+    this.touches.delete(e.pointerId);
+    const p = this.pending;
+    if (p && p.id === e.pointerId) {
+      clearTimeout(this.pendingTimer);
+      if (!cancelled) {
+        if (!p.started) this.startPending(); // a tap
+        this.pointerUp();
+      }
+      this.pending = null;
+    }
+    if (this.touches.size < 2) this.pinch = null;
+    if (this.touches.size === 0) { this.drag = null; this.mouse.inside = false; this.redraw(); }
   }
 
   pointerUp() {

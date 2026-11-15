@@ -104,8 +104,14 @@ export class Player {
   }
 
   update(dt, input, camYaw) {
-    const f = (input.fwd ? 1 : 0) - (input.back ? 1 : 0);
-    const s = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    let f = (input.fwd ? 1 : 0) - (input.back ? 1 : 0);
+    let s = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    // Analog stick (touch): ax right, ay down, each in [-1, 1].
+    let mag = 1;
+    if (input.ax || input.ay) {
+      s = input.ax; f = -input.ay;
+      mag = Math.min(1, Math.hypot(s, f));
+    }
     let mx = -Math.sin(camYaw) * f + Math.cos(camYaw) * s;
     let mz = -Math.cos(camYaw) * f - Math.sin(camYaw) * s;
     const len = Math.hypot(mx, mz);
@@ -117,7 +123,7 @@ export class Player {
     else this.stamina = Math.min(1, this.stamina + dt * (moving ? 0.08 : 0.2));
     this.sprinting = sprinting;
 
-    const target = this.swimming ? 7 : sprinting ? 30 : 13;
+    const target = (this.swimming ? 7 : sprinting ? 30 : 13) * mag;
     const accel = this.onGround || this.swimming ? 10 : 2.5;
     const k = 1 - Math.exp(-accel * dt);
     this.vel.x += ((moving ? mx * target : 0) - this.vel.x) * k;

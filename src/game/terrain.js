@@ -3,9 +3,10 @@
 import * as THREE from 'three';
 import { GW, GH, CELL, toWorldX, toWorldZ } from '../map/mapdoc.js';
 import { BIOMES, snowline } from '../map/biomes.js';
+import { QUALITY } from '../quality.js';
 
 export const CHUNK = 256;
-export const VIEW_RADIUS = 2400;
+export const VIEW_RADIUS = QUALITY.viewRadius;
 const SKIRT = 30;
 
 const tmpColor = new THREE.Color();
@@ -27,7 +28,7 @@ export class Terrain {
     this.buildFar();
   }
 
-  lodFor(d) { return d < 430 ? 64 : d < 950 ? 32 : d < 1700 ? 16 : 8; }
+  lodFor(d) { const L = QUALITY.lod; return d < L[0] ? 64 : d < L[1] ? 32 : d < L[2] ? 16 : 8; }
 
   buildFar() {
     const doc = this.hf.doc;

@@ -3,8 +3,9 @@ import * as THREE from 'three';
 import { mulberry32 } from '../noise.js';
 import { BIOMES, BIOME_BY_KEY } from '../map/biomes.js';
 import { CHUNK } from './terrain.js';
+import { QUALITY } from '../quality.js';
 
-const FLORA_RADIUS = 760;
+const FLORA_RADIUS = QUALITY.floraRadius;
 const SPACING = 8;
 
 // ---------------------------------------------------------- geometry helpers
@@ -155,7 +156,7 @@ export class Flora {
     for (let j = 0; j < cells; j++) {
       for (let i = 0; i < cells; i++) {
         const x = x0 + (i + rng()) * SPACING, z = z0 + (j + rng()) * SPACING;
-        const roll = rng();
+        const roll = rng() / QUALITY.floraDensity;
         const b = hf.biomeAt(x, z);
         const flora = (BIOMES[b] || BIOMES[1]).flora;
         let kind = null, acc = 0;

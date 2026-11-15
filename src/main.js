@@ -5,6 +5,10 @@ import { Editor } from './editor/editor.js';
 import { generateEarthRemix } from './map/generators.js';
 import { toWorldX, toWorldZ, loadMapLocal, lastSavedName } from './map/mapdoc.js';
 import { createMapCanvas, paintRelief } from './map/render2d.js';
+import { QUALITY, IS_TOUCH } from './quality.js';
+import { TouchControls } from './game/touch.js';
+
+if (IS_TOUCH) document.body.classList.add('touch');
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
@@ -12,8 +16,8 @@ const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
 
 // ------------------------------------------------------------------ renderer
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: QUALITY.antialias, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, QUALITY.pixelRatio));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -26,8 +30,9 @@ scene.fog = new THREE.Fog(0xb7cfe0, 300, 3600);
 const sunDir = new THREE.Vector3(0.45, 0.75, -0.48).normalize();
 const sun = new THREE.DirectionalLight(0xfff0d6, 2.6);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -140, right: 140, top: 140, bottom: -140, near: 1, far: 900 });
+sun.shadow.mapSize.set(QUALITY.shadowSize, QUALITY.shadowSize);
+const SR = QUALITY.shadowRange;
+Object.assign(sun.shadow.camera, { left: -SR, right: SR, top: SR, bottom: -SR, near: 1, far: 900 });
 sun.shadow.bias = -0.0005;
 sun.shadow.normalBias = 0.6;
 scene.add(sun, sun.target);
@@ -80,7 +85,7 @@ const clouds = new THREE.Group();
   }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < QUALITY.clouds; i++) {
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.75, depthWrite: false, fog: false }));
     const s = 300 + Math.random() * 400;
     sp.scale.set(s, s * 0.42, 1);
@@ -169,6 +174,7 @@ hud.onTravel = (w) => {
 };
 
 function openEditor() {
+  touch.reset();
   show('title', false);
   show('hud', false);
   show('bigmap-wrap', false);
@@ -212,7 +218,7 @@ $('continue-btn').addEventListener('click', () => { show('victory', false); stat
 $('bigmap-close').addEventListener('click', () => show('bigmap-wrap', false));
 
 // ------------------------------------------------------------------ input
-const input = { fwd: false, back: false, left: false, right: false, sprint: false, jump: false, camL: false, camR: false };
+const input = { fwd: false, back: false, left: false, right: false, sprint: false, jump: false, camL: false, camR: false, ax: 0, ay: 0 };
 const cam = { yaw: Math.PI, pitch: 0.32, dist: 15 };
 const KEYMAP = {
   KeyW: 'fwd', ArrowUp: 'fwd', KeyS: 'back', ArrowDown: 'back',
@@ -228,23 +234,34 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Tab') { e.preventDefault(); openEditor(); }
 });
 window.addEventListener('keyup', (e) => { if (KEYMAP[e.code]) input[KEYMAP[e.code]] = false; });
-window.addEventListener('blur', () => { for (const k in input) input[k] = false; });
+window.addEventListener('blur', () => { for (const k in input) input[k] = typeof input[k] === 'number' ? 0 : false; });
 
 let dragging = false;
-canvas.addEventListener('mousedown', () => {
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'mouse') return;
   dragging = true;
   if (state === 'play' && document.pointerLockElement !== canvas && canvas.requestPointerLock) {
     try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (_) { /* drag to look instead */ }
   }
 });
-window.addEventListener('mouseup', () => { dragging = false; });
-window.addEventListener('mousemove', (e) => {
-  if (state !== 'play') return;
+window.addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse') dragging = false; });
+window.addEventListener('pointermove', (e) => {
+  if (state !== 'play' || e.pointerType !== 'mouse') return;
   if (document.pointerLockElement === canvas || dragging) {
     cam.yaw -= e.movementX * 0.0028;
     cam.pitch = Math.min(1.3, Math.max(-0.25, cam.pitch + e.movementY * 0.0022));
   }
 });
+const touch = new TouchControls(canvas, input, cam, () => state === 'play');
+$('t-map').addEventListener('click', () => show('bigmap-wrap', $('bigmap-wrap').classList.contains('hidden')));
+$('t-fullscreen').addEventListener('click', () => {
+  const el = document.documentElement;
+  try {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (el.requestFullscreen) { const p = el.requestFullscreen({ navigationUI: 'hide' }); if (p && p.catch) p.catch(() => {}); }
+  } catch (_) { /* not allowed here */ }
+});
+if (!document.documentElement.requestFullscreen) $('t-fullscreen').classList.add('hidden');
 canvas.addEventListener('wheel', (e) => {
   cam.dist = Math.min(90, Math.max(5, cam.dist * (1 + Math.sign(e.deltaY) * 0.1)));
   e.preventDefault();

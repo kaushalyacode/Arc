@@ -9,6 +9,7 @@ import { Flora } from './flora.js';
 import { Settlements } from './settlements.js';
 import { Colliders } from './colliders.js';
 import { Player } from './player.js';
+import { QUALITY } from '../quality.js';
 
 const ATMOS = {
   default: { near: 300, far: 3600, sun: 2.6, hemi: 0.9, top: 0x3d7cc9 },
@@ -108,8 +109,8 @@ export class Game {
     for (const key of ['near', 'far', 'sun', 'hemi']) this.atm[key] += (a[key] - this.atm[key]) * k;
     const { fog, sun, hemi, skyMat } = this.env;
     fog.color.copy(this.fogColor);
-    fog.near = this.atm.near;
-    fog.far = this.atm.far;
+    fog.near = this.atm.near * QUALITY.farFog;
+    fog.far = this.atm.far * QUALITY.farFog;
     sun.intensity = this.atm.sun;
     hemi.intensity = this.atm.hemi;
     skyMat.uniforms.bottom.value.copy(this.fogColor);
@@ -119,7 +120,7 @@ export class Game {
 
   // ------------------------------------------------ ambient particles
   makeParticles() {
-    const n = 700;
+    const n = QUALITY.particles;
     const pos = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
       pos[i * 3] = (Math.random() - 0.5) * 120;
