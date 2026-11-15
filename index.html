@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Realm of Waystones</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=EB+Garamond:ital@0;1&display=swap">
+<style>
+  :root {
+    --parchment: #f3e6c4;
+    --ink: #2b1d0e;
+    --gold: #d9a441;
+    --gold-hi: #ffd77a;
+    --panel: rgba(22, 16, 10, 0.62);
+    --panel-edge: rgba(217, 164, 65, 0.55);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0a07; color: var(--parchment);
+    font-family: 'EB Garamond', Georgia, serif; user-select: none; }
+  canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
+  .hidden { display: none !important; }
+
+  /* ---------- title ---------- */
+  #title { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(10,8,5,0.25) 0%, rgba(10,8,5,0.75) 75%); text-align: center; padding: 16px; z-index: 10; }
+  #title h1 { font-family: 'Cinzel', serif; font-weight: 700; font-size: clamp(36px, 7vw, 84px); margin: 0; letter-spacing: 0.06em;
+    color: var(--gold-hi); text-shadow: 0 2px 0 #5a3a10, 0 0 30px rgba(255, 200, 100, 0.35); }
+  #title .tag { font-style: italic; font-size: clamp(16px, 2.2vw, 24px); margin: 10px 0 30px; opacity: 0.9; max-width: 640px; }
+  .btn { font-family: 'Cinzel', serif; font-size: 20px; letter-spacing: 0.1em; padding: 14px 38px; cursor: pointer;
+    color: var(--ink); background: linear-gradient(#ffe3a0, #d9a441); border: 2px solid #6b4511; border-radius: 4px;
+    box-shadow: 0 4px 0 #6b4511, 0 0 24px rgba(255, 200, 100, 0.35); transition: transform .1s; }
+  .btn:hover { transform: translateY(-2px); }
+  .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #6b4511; }
+  #loading { font-style: italic; font-size: 20px; opacity: 0.85; animation: pulse 1.4s infinite; }
+  @keyframes pulse { 50% { opacity: 0.4; } }
+  .keys { margin-top: 28px; display: grid; grid-template-columns: auto auto; gap: 6px 18px; font-size: 16px; text-align: left; opacity: 0.9; }
+  kbd { font-family: 'Cinzel', serif; font-size: 12px; background: var(--parchment); color: var(--ink); border-radius: 3px;
+    padding: 2px 6px; border-bottom: 2px solid #9c8350; margin-right: 3px; }
+
+  /* ---------- hud ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  .panel { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 6px; backdrop-filter: blur(3px); }
+  #compass { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: min(420px, 70vw); height: 34px; overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent); }
+  #compass::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: var(--gold); transform: translateX(-1px); }
+  #compass-strip { position: absolute; inset: 0; }
+  .mark { position: absolute; top: 7px; transform: translateX(-50%); font-family: 'Cinzel', serif; font-size: 12px; opacity: 0.6; }
+  .mark.major { font-size: 16px; opacity: 1; top: 5px; font-weight: 700; }
+  .mark.target { color: #59e1ff; font-size: 14px; top: 6px; opacity: 1; text-shadow: 0 0 6px #3fd6ff; }
+
+  #info { position: absolute; top: 14px; left: 14px; padding: 10px 14px; min-width: 220px; max-width: calc(100vw - 230px); }
+  #region-name { font-family: 'Cinzel', serif; font-size: 18px; color: var(--gold-hi); }
+  #objective { font-size: 15px; margin-top: 4px; opacity: 0.92; }
+  #stones-row { margin-top: 6px; font-size: 15px; }
+  #stones { font-family: 'Cinzel', serif; color: #59e1ff; }
+
+  #map-box { position: absolute; top: 14px; right: 14px; padding: 6px; }
+  #minimap { display: block; width: 180px; height: 180px; border-radius: 3px; }
+  #map-box .hint { font-size: 12px; text-align: center; opacity: 0.8; margin-top: 3px; }
+
+  #bottom { position: absolute; left: 14px; bottom: 14px; padding: 8px 12px; width: 240px; }
+  #bottom .label { font-family: 'Cinzel', serif; font-size: 12px; letter-spacing: .08em; display: flex; justify-content: space-between; }
+  #stamina { height: 8px; background: rgba(255,255,255,0.12); border-radius: 4px; overflow: hidden; margin-top: 4px; }
+  #stamina-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #79c26a, #c9e67c); transition: width .1s; }
+  #stamina-fill.low { background: linear-gradient(90deg, #c0392b, #e67e22); }
+
+  #help { position: absolute; right: 14px; bottom: 14px; padding: 10px 14px; font-size: 14px; line-height: 1.7; }
+
+  #banner { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); text-align: center; opacity: 0; width: 90vw; }
+  #banner.show { animation: banner 4.5s ease forwards; }
+  #banner-title { font-family: 'Cinzel', serif; font-size: clamp(28px, 5vw, 54px); color: var(--gold-hi);
+    text-shadow: 0 2px 6px rgba(0,0,0,0.8), 0 0 24px rgba(0,0,0,0.6); letter-spacing: 0.05em; }
+  #banner-sub { font-style: italic; font-size: clamp(16px, 2vw, 22px); text-shadow: 0 2px 6px rgba(0,0,0,0.9); }
+  #banner .rule { width: 260px; max-width: 60vw; height: 1px; margin: 8px auto; background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+  @keyframes banner { 0% { opacity: 0; transform: translate(-50%, 10px); } 12% { opacity: 1; transform: translate(-50%, 0); }
+    75% { opacity: 1; } 100% { opacity: 0; } }
+
+  #toast { position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%); padding: 10px 22px; font-size: 20px;
+    color: #ffe9a8; opacity: 0; white-space: nowrap; }
+  #toast.show { animation: toast 4s ease forwards; }
+  @keyframes toast { 0% { opacity: 0; } 10% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+  #status { position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%); font-style: italic; opacity: 0.8; text-shadow: 0 1px 3px #000; }
+
+  #bigmap-wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(8,6,4,0.7); z-index: 8; pointer-events: auto; }
+  #bigmap-wrap .frame { padding: 12px; background: #e9d6a6; border: 3px solid #6b4511; border-radius: 4px; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+  #bigmap { width: min(80vh, 90vw); height: min(80vh, 90vw); display: block; }
+  #bigmap-wrap .cap { color: var(--ink); text-align: center; font-family: 'Cinzel', serif; margin-top: 6px; font-size: 14px; }
+
+  #victory { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    background: radial-gradient(ellipse at center, rgba(40,28,8,0.55), rgba(8,6,4,0.9)); z-index: 9; padding: 16px; }
+  #victory h2 { font-family: 'Cinzel', serif; color: var(--gold-hi); font-size: clamp(30px, 5vw, 60px); margin: 0 0 10px; }
+  #victory p { font-size: 20px; max-width: 620px; font-style: italic; }
+  #victory-stats { font-family: 'Cinzel', serif; font-size: 15px; margin: 6px 0 26px; opacity: 0.85; }
+
+  @media (max-width: 640px) {
+    #map-box { transform: scale(0.7); transform-origin: top right; }
+    #help { display: none; }
+    #info { max-width: calc(100vw - 160px); min-width: 0; }
+    #compass { top: auto; bottom: 70px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="game" tabindex="0"></canvas>
+
+<div id="title">
+  <h1>Realm of Waystones</h1>
+  <div class="tag">From the green hills of Thistledown to the burning slopes of Mount Cinder, five ancient waystones sleep. Wake them all.</div>
+  <div id="loading">Shaping the world…</div>
+  <button id="start-btn" class="btn hidden">Begin Journey</button>
+  <div class="keys">
+    <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows</div><div>Walk</div>
+    <div><kbd>Shift</kbd></div><div>Run</div>
+    <div><kbd>Space</kbd></div><div>Jump</div>
+    <div>Mouse / <kbd>Q</kbd><kbd>E</kbd></div><div>Turn the camera (click to lock the mouse)</div>
+    <div>Scroll wheel</div><div>Zoom</div>
+    <div><kbd>M</kbd></div><div>Open the map</div>
+  </div>
+</div>
+
+<div id="hud" class="hidden">
+  <div id="compass" class="panel"><div id="compass-strip"></div></div>
+  <div id="info" class="panel">
+    <div id="region-name">—</div>
+    <div id="objective"></div>
+    <div id="stones-row">Waystones lit: <span id="stones">0 / 5</span></div>
+  </div>
+  <div id="map-box" class="panel">
+    <canvas id="minimap" width="180" height="180"></canvas>
+    <div class="hint"><kbd>M</kbd> full map</div>
+  </div>
+  <div id="bottom" class="panel">
+    <div class="label"><span>Stamina</span></div>
+    <div id="stamina"><div id="stamina-fill"></div></div>
+  </div>
+  <div id="help" class="panel">
+    <div><kbd>WASD</kbd> walk · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump</div>
+    <div>Mouse / <kbd>Q</kbd><kbd>E</kbd> camera · wheel zoom</div>
+    <div><kbd>M</kbd> map · <kbd>H</kbd> hide help</div>
+  </div>
+  <div id="status"></div>
+  <div id="banner"><div id="banner-title"></div><div class="rule"></div><div id="banner-sub"></div></div>
+  <div id="toast" class="panel"></div>
+</div>
+
+<div id="bigmap-wrap" class="hidden">
+  <div class="frame">
+    <canvas id="bigmap" width="720" height="720"></canvas>
+    <div class="cap">The Realm · press M or click to close</div>
+  </div>
+</div>
+
+<div id="victory" class="hidden">
+  <h2>The Five Waystones Burn Bright</h2>
+  <p>Their light runs from the hills to the ash, and the old roads wake again. Your journey is told in every corner of the realm.</p>
+  <div id="victory-stats"></div>
+  <button id="continue-btn" class="btn">Keep Exploring</button>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./lib/three.module.min.js" } }
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
